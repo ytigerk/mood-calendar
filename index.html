@@ -19,6 +19,7 @@
     --mood-grad:linear-gradient(90deg,#1c1c1e 0%,#d9372b 25%,#f39a2e 50%,#34b36a 75%,#2a6de0 100%);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   html,body{margin:0;background:var(--bg);color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
   body{min-height:100vh;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 28px)}
@@ -71,10 +72,10 @@
 
   /* 캘린더 */
   .cal{background:var(--card);border-radius:20px;padding:12px 10px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04);touch-action:pan-y}
-  .week,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .week,.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
   .week div{text-align:center;font-size:12px;color:var(--sub);padding:2px 0 8px;font-weight:600}
   .week div:first-child{color:var(--sun)} .week div:last-child{color:var(--sat)}
-  .day{aspect-ratio:1/1.15;border-radius:12px;background:var(--empty);border:0;padding:6px 0 0;
+  .day{min-width:0;width:100%;aspect-ratio:1/1.15;overflow:hidden;-webkit-appearance:none;appearance:none;border-radius:12px;background:var(--empty);border:0;padding:6px 0 0;
     display:flex;flex-direction:column;align-items:center;color:var(--ink);position:relative;
     transition:transform .12s}
   .day:active{transform:scale(.94)}
@@ -281,9 +282,9 @@ function saveAll(data){
 }
 let records = loadAll();
 
-/* ---------- 색상: -10 검정 → -5 빨강 → 0 주황 → +5 초록 → +10 파랑 ---------- */
+/* ---------- 색상: -10 빨강 → -5 주황 → 0 노랑 → +1 연두 → +5 초록 → +10 파랑 ---------- */
 const STOPS = [
-  [-10,[28,28,30]], [-5,[217,55,43]], [0,[243,154,46]], [5,[52,179,106]], [10,[42,109,224]]
+  [-10,[204,36,48]], [-5,[243,138,40]], [0,[246,200,52]], [1,[140,202,92]], [5,[52,179,106]], [10,[42,109,224]]
 ];
 function moodRGB(s){
   for(let i=0;i<STOPS.length-1;i++){
@@ -295,10 +296,13 @@ function moodRGB(s){
   }
   return STOPS[2][1];
 }
+// 범례·슬라이더 색 막대도 같은 색으로 (21칸)
+const GRAD = Array.from({length:21},(_,i)=>`${moodColor(i-10)} ${(i/20*100).toFixed(1)}%`).join(',');
+document.documentElement.style.setProperty('--mood-grad', `linear-gradient(90deg,${GRAD})`);
 function moodColor(s){ return `rgb(${moodRGB(s).join(',')})`; }
 function textColor(s){
   const [r,g,b]=moodRGB(s);
-  return (0.299*r+0.587*g+0.114*b) > 165 ? '#1d1d1f' : '#ffffff';
+  return (0.299*r+0.587*g+0.114*b) > 140 ? '#1d1d1f' : '#ffffff';
 }
 function moodLabel(s){
   if(s<=-6) return '최악';
@@ -367,10 +371,7 @@ function renderChart(){
   const x = d => L + 8 + (d-1)/(days-1)*(W-L-R-8);
   const y = s => T + (10-s)/20*(H-T-B);
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${viewM+1}월 기분 흐름 그래프">
-    <defs><linearGradient id="yg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${moodColor(10)}"/><stop offset=".25" stop-color="${moodColor(5)}"/>
-      <stop offset=".5" stop-color="${moodColor(0)}"/><stop offset=".75" stop-color="${moodColor(-5)}"/>
-      <stop offset="1" stop-color="${moodColor(-10)}"/></linearGradient></defs>`;
+    <defs><linearGradient id="yg" x1="0" y1="0" x2="0" y2="1">${Array.from({length:21},(_,i)=>`<stop offset="${i/20}" stop-color="${moodColor(10-i)}"/>`).join('')}</linearGradient></defs>`;
 
   // 눈금과 보조선
   [-10,-5,0,5,10].forEach(v=>{

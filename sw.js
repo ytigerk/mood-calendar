@@ -1,6 +1,6 @@
 // 오프라인에서도 열리도록 앱 파일을 보관하는 도우미 (기록 데이터는 다루지 않음)
 // 인터넷이 되면 항상 최신 파일을 받고, 안 되면 보관해 둔 파일로 열어요.
-const CACHE = 'mood-calendar-v1';
+const CACHE = 'mood-calendar-v2';
 const FILES = ['./', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png'];
 
