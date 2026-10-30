@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f2">
+<title>기분 캘린더</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="기분 캘린더">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+  :root{
+    --bg:#f6f5f2; --card:#ffffff; --ink:#1d1d1f; --sub:#8a8a8e;
+    --line:#e7e5e0; --empty:#efeee9; --sun:#e0483c; --sat:#3a6fd8;
+    --mood-grad:linear-gradient(90deg,#1c1c1e 0%,#d9372b 25%,#f39a2e 50%,#34b36a 75%,#2a6de0 100%);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
+  body{min-height:100vh;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 28px)}
+  button{font:inherit;cursor:pointer}
+  .app{max-width:480px;margin:0 auto}
+
+  /* 탭 */
+  .tabs{display:flex;background:#e9e7e1;border-radius:14px;padding:4px;margin-bottom:14px}
+  .tab{flex:1;height:40px;border:0;border-radius:11px;background:transparent;color:var(--sub);
+    font-size:15px;font-weight:700;transition:background .15s,color .15s}
+  .tab.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .view[hidden]{display:none}
+  .view .chart-card{margin-top:0}
+
+  /* 상단 */
+  header[hidden]{display:none}
+  header{display:flex;align-items:center;justify-content:space-between;margin:2px 2px 14px}
+  .month{font-size:22px;white-space:nowrap;font-weight:700;letter-spacing:-.02em}
+  .nav{display:flex;gap:5px}
+  .btn-icon{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+    font-size:17px;color:var(--ink);display:grid;place-items:center}
+  .btn-today{height:40px;padding:0 13px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+    font-size:14px;font-weight:600;color:var(--ink)}
+
+  /* 설정 */
+  .set-group{margin-bottom:22px}
+  .set-title{font-size:13px;font-weight:700;color:var(--sub);margin:0 6px 8px}
+  .set-card{background:var(--card);border-radius:20px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .set-desc{font-size:14px;line-height:1.55;color:#4a4a4e}
+  .set-count{font-size:13px;color:var(--sub);margin-top:8px}
+  .set-btns{display:flex;gap:8px;margin-top:14px}
+  .set-btn{flex:1;height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card);
+    font-size:15px;font-weight:700;color:var(--ink)}
+  .set-btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+  .set-btn:disabled{opacity:.45}
+  .howto{margin-top:14px;background:var(--bg);border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.6}
+  .howto[hidden]{display:none}
+  .howto ol{margin:6px 0 0;padding-left:20px}
+  .howto b{font-weight:700}
+  .tab{font-size:15px}
+
+  /* 불러오기 선택 */
+  .choice{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+  .choice button{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:14px 16px;color:var(--ink)}
+  .choice button:active{background:var(--empty)}
+  .choice b{display:block;font-size:16px;margin-bottom:4px}
+  .choice span{font-size:13px;color:var(--sub);line-height:1.45}
+  .choice button.armed{background:var(--sun);border-color:var(--sun);color:#fff}
+  .choice button.armed span{color:#fff}
+
+  /* 캘린더 */
+  .cal{background:var(--card);border-radius:20px;padding:12px 10px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04);touch-action:pan-y}
+  .week,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .week div{text-align:center;font-size:12px;color:var(--sub);padding:2px 0 8px;font-weight:600}
+  .week div:first-child{color:var(--sun)} .week div:last-child{color:var(--sat)}
+  .day{aspect-ratio:1/1.15;border-radius:12px;background:var(--empty);border:0;padding:6px 0 0;
+    display:flex;flex-direction:column;align-items:center;color:var(--ink);position:relative;
+    transition:transform .12s}
+  .day:active{transform:scale(.94)}
+  .day .d{font-size:13px;font-weight:600}
+  .day .s{margin-top:auto;margin-bottom:7px;font-size:13px;font-weight:800}
+  .day.blank{background:transparent;pointer-events:none}
+  .day.sun .d{color:var(--sun)} .day.sat .d{color:var(--sat)}
+  .day.filled .d{color:inherit;opacity:.85}
+  .day.today{box-shadow:inset 0 0 0 2px var(--ink)}
+  .day.filled.today{box-shadow:inset 0 0 0 2px #fff, 0 0 0 2px var(--ink)}
+  .day.memo::after{content:"";position:absolute;top:6px;right:6px;width:5px;height:5px;border-radius:50%;
+    background:currentColor;opacity:.75}
+
+  /* 색 범례 */
+  .legend{margin:16px 4px 0}
+  .legend .bar{height:10px;border-radius:99px;background:var(--mood-grad)}
+  .legend .labels{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--sub)}
+  .legend .labels span{width:20%;text-align:center}
+  .legend .labels span:first-child{text-align:left} .legend .labels span:last-child{text-align:right}
+  .hint{text-align:center;font-size:12px;color:var(--sub);margin-top:18px}
+
+  /* 기분 흐름 그래프 */
+  .chart-card{background:var(--card);border-radius:20px;padding:14px 12px 10px;margin-top:16px;
+    box-shadow:0 1px 2px rgba(0,0,0,.04);position:relative}
+  .chart-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 4px 6px}
+  .chart-title{font-size:16px;font-weight:700}
+  .chart-sub{font-size:12px;color:var(--sub)}
+  .chart-wrap{position:relative}
+  .chart-wrap svg{display:block;width:100%;height:auto;touch-action:pan-y}
+  .chart-empty{text-align:center;color:var(--sub);font-size:13px;padding:38px 0 34px}
+  .tip{position:absolute;top:0;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:10px;
+    padding:7px 10px;font-size:12px;line-height:1.4;pointer-events:none;white-space:nowrap;max-width:220px;
+    opacity:0;transition:opacity .12s;z-index:2}
+  .tip.on{opacity:1}
+  .tip b{font-size:13px}
+  .tip .m{display:block;opacity:.8;overflow:hidden;text-overflow:ellipsis}
+
+  /* 아래에서 올라오는 창 */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s}
+  .overlay.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:var(--card);
+    border-radius:22px 22px 0 0;padding:10px 18px calc(env(safe-area-inset-bottom) + 18px);
+    transform:translateY(105%);transition:transform .25s ease;max-height:92vh;overflow-y:auto}
+  .sheet.on{transform:translateY(0)}
+  .grab{width:38px;height:5px;border-radius:99px;background:var(--line);margin:0 auto 10px}
+  .sheet-head{display:flex;justify-content:space-between;align-items:flex-start}
+  .sheet-date{font-size:19px;font-weight:700}
+  .sheet-state{font-size:13px;color:var(--sub);margin-top:3px}
+
+  .score-row{display:flex;align-items:center;justify-content:center;gap:16px;margin:16px 0 6px}
+  .step{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--card);font-size:22px;color:var(--ink)}
+  .badge{width:86px;height:86px;border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    transition:background .15s,color .15s}
+  .badge .num{font-size:32px;font-weight:800;line-height:1}
+  .badge .lab{font-size:12px;font-weight:700;margin-top:5px;opacity:.9}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;border-radius:99px;
+    background:var(--mood-grad);margin:14px 0 4px;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;
+    background:#fff;border:3px solid var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.25)}
+  input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid var(--ink)}
+  .ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);padding:0 4px}
+
+  textarea{width:100%;min-height:130px;margin-top:16px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;
+    font:inherit;font-size:16px;line-height:1.5;resize:vertical;background:#fbfbf9;color:var(--ink)}
+  textarea:focus{outline:2px solid var(--ink);outline-offset:-1px;background:#fff}
+  .actions{display:flex;gap:10px;margin-top:14px}
+  .actions button{flex:1;height:50px;border-radius:14px;font-size:16px;font-weight:700}
+  .ghost{background:var(--card);border:1px solid var(--line);color:var(--sun)}
+  .ghost.armed{background:var(--sun);color:#fff;border-color:var(--sun)}
+  .ghost:disabled{color:var(--sub);opacity:.5}
+  .primary{background:var(--ink);border:0;color:#fff}
+
+  .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 16px);transform:translate(-50%,-20px);
+    background:var(--ink);color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;opacity:0;
+    transition:all .2s;pointer-events:none;z-index:10}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="tabs" role="tablist">
+    <button class="tab on" id="tabCal" role="tab" aria-selected="true">캘린더</button>
+    <button class="tab" id="tabChart" role="tab" aria-selected="false">그래프</button>
+    <button class="tab" id="tabSet" role="tab" aria-selected="false">설정</button>
+  </nav>
+  <header id="monthHeader">
+    <div class="month" id="monthTitle"></div>
+    <div class="nav">
+      <button class="btn-icon" id="prevBtn" aria-label="이전 달">‹</button>
+      <button class="btn-today" id="todayBtn">오늘</button>
+      <button class="btn-icon" id="nextBtn" aria-label="다음 달">›</button>
+    </div>
+  </header>
+
+  <div class="view" id="viewCal">
+    <div class="cal" id="cal">
+      <div class="week"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="legend">
+      <div class="bar"></div>
+      <div class="labels"><span>-10 최악</span><span>-5 나쁨</span><span>0 보통</span><span>+5 좋음</span><span>+10 최고</span></div>
+    </div>
+    <div class="hint">날짜를 누르면 기분과 메모를 남길 수 있어요 · 좌우로 밀어 달 이동</div>
+  </div>
+
+  <div class="view" id="viewChart" hidden>
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-title">기분 흐름</div>
+        <div class="chart-sub" id="chartSub"></div>
+      </div>
+      <div class="chart-wrap" id="chartWrap"></div>
+    </div>
+    <div class="hint">그래프를 누르면 그날의 점수와 메모가 보여요</div>
+  </div>
+
+  <div class="view" id="viewSet" hidden>
+    <div class="set-group">
+      <div class="set-title">백업</div>
+      <div class="set-card">
+        <div class="set-desc">기록은 이 휴대폰 브라우저에만 저장돼요. 가끔 파일로 꺼내 두면 폰을 바꾸거나 데이터가 지워져도 되살릴 수 있어요.</div>
+        <div class="set-count" id="setCount"></div>
+        <div class="set-btns">
+          <button class="set-btn primary" id="exportBtn">백업 내보내기</button>
+          <button class="set-btn" id="importBtn">백업 불러오기</button>
+        </div>
+        <input type="file" id="fileInput" accept=".json,application/json" hidden>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <div class="set-title">홈 화면</div>
+      <div class="set-card">
+        <div class="set-desc" id="installDesc">홈 화면에 추가하면 앱처럼 아이콘을 눌러 바로 열 수 있고, 기록도 더 안정적으로 보관돼요.</div>
+        <div class="set-btns">
+          <button class="set-btn primary" id="installBtn">홈 화면에 추가</button>
+        </div>
+        <div class="howto" id="howto" hidden></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<section class="sheet" id="sheet" aria-hidden="true">
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <div>
+      <div class="sheet-date" id="sheetDate"></div>
+      <div class="sheet-state" id="sheetState"></div>
+    </div>
+    <button class="btn-icon" id="closeBtn" aria-label="닫기">✕</button>
+  </div>
+
+  <div class="score-row">
+    <button class="step" id="minusBtn" aria-label="1 낮추기">−</button>
+    <div class="badge" id="badge"><div class="num" id="badgeNum">0</div><div class="lab" id="badgeLab">보통</div></div>
+    <button class="step" id="plusBtn" aria-label="1 올리기">+</button>
+  </div>
+  <input type="range" id="slider" min="-10" max="10" step="1" value="0" aria-label="기분 점수">
+  <div class="ticks"><span>-10</span><span>-5</span><span>0</span><span>+5</span><span>+10</span></div>
+
+  <textarea id="memo" placeholder="오늘 있었던 일, 떠오르는 생각을 적어보세요"></textarea>
+  <div class="actions">
+    <button class="ghost" id="delBtn">기록 삭제</button>
+    <button class="primary" id="saveBtn">저장</button>
+  </div>
+</section>
+<section class="sheet" id="importSheet" aria-hidden="true">
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <div>
+      <div class="sheet-date">백업 불러오기</div>
+      <div class="sheet-state" id="importInfo"></div>
+    </div>
+    <button class="btn-icon" id="importClose" aria-label="닫기">✕</button>
+  </div>
+  <div class="choice">
+    <button id="mergeBtn">
+      <b>합치기</b>
+      <span>지금 기록은 그대로 두고 없는 날만 채워요. 같은 날이 겹치면 더 최근에 수정한 쪽을 남겨요.</span>
+    </button>
+    <button id="replaceBtn">
+      <b>덮어쓰기</b>
+      <span id="replaceDesc">지금 기록을 모두 지우고 백업 내용으로 바꿔요.</span>
+    </button>
+  </div>
+</section>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- 저장소: 휴대폰 브라우저에 보관 (안 되면 임시 메모리) ---------- */
+const STORE_KEY = 'moodCalendar.v1';
+let memoryStore = {};
+function loadAll(){
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
+  catch(e){ return memoryStore; }
+}
+function saveAll(data){
+  memoryStore = data;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e){}
+}
+let records = loadAll();
+
+/* ---------- 색상: -10 검정 → -5 빨강 → 0 주황 → +5 초록 → +10 파랑 ---------- */
+const STOPS = [
+  [-10,[28,28,30]], [-5,[217,55,43]], [0,[243,154,46]], [5,[52,179,106]], [10,[42,109,224]]
+];
+function moodRGB(s){
+  for(let i=0;i<STOPS.length-1;i++){
+    const [a,ca]=STOPS[i], [b,cb]=STOPS[i+1];
+    if(s>=a && s<=b){
+      const t=(s-a)/(b-a);
+      return ca.map((v,k)=>Math.round(v+(cb[k]-v)*t));
+    }
+  }
+  return STOPS[2][1];
+}
+function moodColor(s){ return `rgb(${moodRGB(s).join(',')})`; }
+function textColor(s){
+  const [r,g,b]=moodRGB(s);
+  return (0.299*r+0.587*g+0.114*b) > 165 ? '#1d1d1f' : '#ffffff';
+}
+function moodLabel(s){
+  if(s<=-6) return '최악';
+  if(s<=-2) return '나쁨';
+  if(s<=1)  return '보통';
+  if(s<=5)  return '좋음';
+  return '최고';
+}
+const fmtScore = s => (s>0?'+':'') + s;
+
+/* ---------- 날짜 도우미 ---------- */
+const pad = n => String(n).padStart(2,'0');
+const keyOf = (y,m,d) => `${y}-${pad(m+1)}-${pad(d)}`;
+const DOW = ['일','월','화','수','목','금','토'];
+const now = new Date();
+const todayKey = keyOf(now.getFullYear(), now.getMonth(), now.getDate());
+let viewY = now.getFullYear(), viewM = now.getMonth();
+
+/* ---------- 캘린더 그리기 ---------- */
+const grid = document.getElementById('grid');
+function render(){
+  document.getElementById('monthTitle').textContent = `${viewY}년 ${viewM+1}월`;
+  grid.innerHTML = '';
+  const first = new Date(viewY, viewM, 1).getDay();
+  const days = new Date(viewY, viewM+1, 0).getDate();
+  for(let i=0;i<first;i++){
+    const b=document.createElement('div'); b.className='day blank'; grid.appendChild(b);
+  }
+  for(let d=1; d<=days; d++){
+    const key = keyOf(viewY, viewM, d);
+    const rec = records[key];
+    const dow = (first + d - 1) % 7;
+    const el = document.createElement('button');
+    el.className = 'day' + (dow===0?' sun':'') + (dow===6?' sat':'') + (key===todayKey?' today':'');
+    el.innerHTML = `<span class="d">${d}</span><span class="s"></span>`;
+    if(rec){
+      el.classList.add('filled');
+      el.style.background = moodColor(rec.score);
+      el.style.color = textColor(rec.score);
+      el.querySelector('.s').textContent = fmtScore(rec.score);
+      if(rec.memo && rec.memo.trim()) el.classList.add('memo');
+    }
+    el.addEventListener('click', () => openSheet(key, d, dow));
+    grid.appendChild(el);
+  }
+  renderChart();
+  if(document.getElementById('setCount')) updateSettings();
+}
+
+/* ---------- 기분 흐름 그래프 (이번 달) ---------- */
+const chartWrap = document.getElementById('chartWrap');
+function renderChart(){
+  const days = new Date(viewY, viewM+1, 0).getDate();
+  const pts = [];
+  for(let d=1; d<=days; d++){
+    const rec = records[keyOf(viewY, viewM, d)];
+    if(rec) pts.push({d, s:rec.score, memo:rec.memo||''});
+  }
+  document.getElementById('chartSub').textContent = pts.length ? `${viewM+1}월 · ${pts.length}일 기록` : `${viewM+1}월`;
+  if(!pts.length){
+    chartWrap.innerHTML = '<div class="chart-empty">이번 달 기록이 생기면 여기에 흐름이 그려져요</div>';
+    return;
+  }
+
+  const W=340, H=200, L=34, R=10, T=12, B=26;
+  const x = d => L + 8 + (d-1)/(days-1)*(W-L-R-8);
+  const y = s => T + (10-s)/20*(H-T-B);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${viewM+1}월 기분 흐름 그래프">
+    <defs><linearGradient id="yg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${moodColor(10)}"/><stop offset=".25" stop-color="${moodColor(5)}"/>
+      <stop offset=".5" stop-color="${moodColor(0)}"/><stop offset=".75" stop-color="${moodColor(-5)}"/>
+      <stop offset="1" stop-color="${moodColor(-10)}"/></linearGradient></defs>`;
+
+  // 눈금과 보조선
+  [-10,-5,0,5,10].forEach(v=>{
+    svg += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="${v===0?'#cfccc5':'#ecebe6'}" stroke-width="1" ${v===0?'':'stroke-dasharray="3 4"'}/>`;
+    svg += `<text x="${L-12}" y="${y(v)+4}" text-anchor="end" font-size="10" fill="#8a8a8e">${fmtScore(v)}</text>`;
+  });
+  svg += `<rect x="${L-8}" y="${y(10)}" width="4" height="${y(-10)-y(10)}" rx="2" fill="url(#yg)"/>`;
+  const xt = [1,5,10,15,20,25,days].filter((v,i,a)=>a.indexOf(v)===i && !(v!==days && days-v<3));
+  xt.forEach(d=>{
+    svg += `<text x="${x(d)}" y="${H-8}" text-anchor="middle" font-size="10" fill="#8a8a8e">${d}일</text>`;
+  });
+
+  // 선: 이어진 날은 실선, 기록이 빈 날을 건너뛰면 점선
+  for(let i=1;i<pts.length;i++){
+    const a=pts[i-1], b=pts[i], gap=b.d-a.d>1;
+    svg += `<line x1="${x(a.d)}" y1="${y(a.s)}" x2="${x(b.d)}" y2="${y(b.s)}" stroke="#1d1d1f"
+      stroke-opacity="${gap?.3:.55}" stroke-width="2" stroke-linecap="round" ${gap?'stroke-dasharray="2 5"':''}/>`;
+  }
+  // 강조선(터치한 날)
+  svg += `<line id="cross" x1="0" x2="0" y1="${T}" y2="${H-B}" stroke="#1d1d1f" stroke-opacity=".25" stroke-width="1" visibility="hidden"/>`;
+  // 점
+  pts.forEach(p=>{
+    svg += `<circle cx="${x(p.d)}" cy="${y(p.s)}" r="5" fill="${moodColor(p.s)}" stroke="#fff" stroke-width="2"/>`;
+  });
+  svg += `<rect id="hit" x="${L}" y="0" width="${W-L}" height="${H}" fill="transparent"/>`;
+  svg += `</svg><div class="tip" id="tip"></div>`;
+  chartWrap.innerHTML = svg;
+
+  // 터치/마우스로 날짜 정보 보기
+  const svgEl = chartWrap.querySelector('svg'), tip = document.getElementById('tip'), cross = document.getElementById('cross');
+  function show(clientX){
+    const r = svgEl.getBoundingClientRect();
+    const vx = (clientX - r.left) / r.width * W;
+    let best = pts[0];
+    pts.forEach(p=>{ if(Math.abs(x(p.d)-vx) < Math.abs(x(best.d)-vx)) best = p; });
+    const px = x(best.d);
+    cross.setAttribute('x1',px); cross.setAttribute('x2',px); cross.setAttribute('visibility','visible');
+    const dow = DOW[new Date(viewY, viewM, best.d).getDay()];
+    const memoLine = best.memo.trim() ? `<span class="m">${escapeHtml(best.memo.trim().split('\n')[0])}</span>` : '';
+    tip.innerHTML = `${viewM+1}월 ${best.d}일 (${dow}) · <b>${fmtScore(best.s)} ${moodLabel(best.s)}</b>${memoLine}`;
+    const leftPx = px / W * r.width;
+    const half = Math.min(tip.offsetWidth, 220) / 2;
+    tip.style.left = Math.max(half, Math.min(r.width - half, leftPx)) + 'px';
+    const topPx = y(best.s) / H * r.height;
+    tip.style.top = (topPx > r.height/2 ? Math.max(0, topPx - 58) : topPx + 14) + 'px';
+    tip.classList.add('on');
+  }
+  function hide(){ tip.classList.remove('on'); cross.setAttribute('visibility','hidden'); }
+  svgEl.addEventListener('pointerdown', e => show(e.clientX));
+  svgEl.addEventListener('pointermove', e => { if(e.pointerType==='mouse' || e.buttons) show(e.clientX); });
+  svgEl.addEventListener('pointerleave', e => { if(e.pointerType==='mouse') hide(); });
+  hideChartTip = hide;
+}
+let hideChartTip = () => {};
+document.addEventListener('pointerdown', e => { if(!chartWrap.contains(e.target)) hideChartTip(); });
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function moveMonth(diff){
+  viewM += diff;
+  if(viewM<0){ viewM=11; viewY--; }
+  if(viewM>11){ viewM=0; viewY++; }
+  render();
+}
+document.getElementById('prevBtn').onclick = () => moveMonth(-1);
+document.getElementById('nextBtn').onclick = () => moveMonth(1);
+document.getElementById('todayBtn').onclick = () => { viewY=now.getFullYear(); viewM=now.getMonth(); render(); };
+
+/* 좌우로 밀어서 달 이동 */
+let sx=null, sy=null;
+const cal = document.getElementById('cal');
+cal.addEventListener('touchstart', e => { sx=e.touches[0].clientX; sy=e.touches[0].clientY; }, {passive:true});
+cal.addEventListener('touchend', e => {
+  if(sx===null) return;
+  const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy;
+  if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5) moveMonth(dx<0?1:-1);
+  sx=null;
+});
+
+/* ---------- 기록 창 ---------- */
+const sheet=document.getElementById('sheet'), overlay=document.getElementById('overlay');
+const slider=document.getElementById('slider'), memo=document.getElementById('memo');
+const badge=document.getElementById('badge');
+let currentKey=null;
+
+function paintBadge(){
+  const s = Number(slider.value);
+  badge.style.background = moodColor(s);
+  badge.style.color = textColor(s);
+  document.getElementById('badgeNum').textContent = fmtScore(s);
+  document.getElementById('badgeLab').textContent = moodLabel(s);
+}
+function openSheet(key, d, dow){
+  currentKey = key;
+  const rec = records[key];
+  document.getElementById('sheetDate').textContent = `${viewM+1}월 ${d}일 (${DOW[dow]})`;
+  document.getElementById('sheetState').textContent = rec ? '저장된 기록이 있어요' : '아직 기록이 없어요';
+  slider.value = rec ? rec.score : 0;
+  memo.value = rec ? (rec.memo||'') : '';
+  document.getElementById('delBtn').disabled = !rec;
+  paintBadge();
+  resetDel();
+  sheet.classList.add('on'); overlay.classList.add('on');
+  sheet.setAttribute('aria-hidden','false');
+}
+function closeSheet(){
+  sheet.classList.remove('on'); overlay.classList.remove('on');
+  importSheet.classList.remove('on'); importSheet.setAttribute('aria-hidden','true');
+  sheet.setAttribute('aria-hidden','true');
+  memo.blur();
+}
+slider.addEventListener('input', paintBadge);
+document.getElementById('minusBtn').onclick = () => { slider.value = Math.max(-10, Number(slider.value)-1); paintBadge(); };
+document.getElementById('plusBtn').onclick  = () => { slider.value = Math.min(10,  Number(slider.value)+1); paintBadge(); };
+overlay.onclick = closeSheet;
+document.getElementById('closeBtn').onclick = closeSheet;
+
+document.getElementById('saveBtn').onclick = () => {
+  records[currentKey] = { score: Number(slider.value), memo: memo.value, updated: new Date().toISOString() };
+  saveAll(records); render(); closeSheet(); toast('저장했어요');
+};
+/* 삭제: 실수 방지를 위해 두 번 눌러야 지워짐 */
+const delBtn = document.getElementById('delBtn');
+let delArmed = false;
+function resetDel(){ delArmed = false; delBtn.textContent = '기록 삭제'; delBtn.classList.remove('armed'); }
+delBtn.onclick = () => {
+  if(!records[currentKey]) return;
+  if(!delArmed){
+    delArmed = true; delBtn.textContent = '한 번 더 누르면 삭제'; delBtn.classList.add('armed');
+    clearTimeout(resetDel._t); resetDel._t = setTimeout(resetDel, 3000);
+    return;
+  }
+  delete records[currentKey];
+  saveAll(records); render(); closeSheet(); toast('삭제했어요');
+};
+
+/* ---------- 탭: 캘린더 / 그래프 ---------- */
+const TAB_KEY = 'moodCalendar.tab';
+const TABS = { cal:['tabCal','viewCal'], chart:['tabChart','viewChart'], set:['tabSet','viewSet'] };
+function showTab(name){
+  if(!TABS[name]) name = 'cal';
+  for(const [k,[tabId,viewId]] of Object.entries(TABS)){
+    const on = k === name;
+    document.getElementById(viewId).hidden = !on;
+    const t = document.getElementById(tabId); t.classList.toggle('on',on); t.setAttribute('aria-selected',on);
+  }
+  document.getElementById('monthHeader').hidden = name === 'set';   // 설정 화면에서는 월 이동 숨김
+  if(name === 'chart') renderChart();
+  if(name === 'set') updateSettings();
+  try{ localStorage.setItem(TAB_KEY, name); }catch(e){}
+}
+Object.keys(TABS).forEach(k => document.getElementById(TABS[k][0]).onclick = () => showTab(k));
+function updateSettings(){
+  const n = Object.keys(records).length;
+  document.getElementById('setCount').textContent = n ? `지금 ${n}일의 기록이 저장되어 있어요` : '아직 저장된 기록이 없어요';
+}
+
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),1400);
+}
+
+/* ---------- 백업: 내보내기 / 불러오기 ---------- */
+const importSheet = document.getElementById('importSheet');
+
+document.getElementById('exportBtn').onclick = async () => {
+  const count = Object.keys(records).length;
+  if(!count){ toast('아직 백업할 기록이 없어요'); return; }
+  const payload = { app:'mood-calendar', version:1, exported:new Date().toISOString(), records };
+  const name = `mood-backup-${todayKey}.json`;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  // 1) 휴대폰 공유창 (카톡, 메일, 드라이브 등)
+  try{
+    const file = new File([blob], name, {type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:'기분 캘린더 백업'});
+      toast(`${count}일 기록을 내보냈어요`);
+      return;
+    }
+  }catch(err){
+    if(err && err.name === 'AbortError') return;   // 사용자가 공유창을 닫음
+  }
+  // 2) 공유창이 안 되면 파일로 다운로드
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast(`${count}일 기록을 저장했어요`);
+};
+
+let pending = null;
+const fileInput = document.getElementById('fileInput');
+document.getElementById('importBtn').onclick = () => { fileInput.value=''; fileInput.click(); };
+fileInput.onchange = async () => {
+  const f = fileInput.files[0]; if(!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    pending = cleanRecords(data && data.records ? data.records : data);
+  }catch(e){ pending = null; }
+  fileInput.value = '';
+  if(!pending || !Object.keys(pending).length){ toast('백업 파일이 아니에요'); return; }
+  const keys = Object.keys(pending).sort();
+  const fmt = k => k.replace(/^(\d+)-(\d+)-(\d+)$/, (m,y,mo,d)=>`${y}.${+mo}.${+d}`);
+  document.getElementById('importInfo').textContent =
+    `${keys.length}일 기록 · ${fmt(keys[0])} ~ ${fmt(keys[keys.length-1])}`;
+  resetReplace();
+  importSheet.classList.add('on'); overlay.classList.add('on'); importSheet.setAttribute('aria-hidden','false');
+};
+function cleanRecords(obj){
+  if(!obj || typeof obj !== 'object') return null;
+  const out = {};
+  for(const [k,v] of Object.entries(obj)){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(k) || !v) continue;
+    const s = Number(v.score);
+    if(!Number.isInteger(s) || s < -10 || s > 10) continue;
+    out[k] = { score:s, memo: typeof v.memo === 'string' ? v.memo : '', updated: typeof v.updated === 'string' ? v.updated : '' };
+  }
+  return out;
+}
+document.getElementById('mergeBtn').onclick = () => {
+  let added = 0;
+  for(const [k,v] of Object.entries(pending)){
+    const cur = records[k];
+    if(!cur || (v.updated || '') > (cur.updated || '')){ records[k] = v; added++; }
+  }
+  saveAll(records); render(); closeSheet();
+  toast(added ? `${added}일 기록을 합쳤어요` : '새로 추가할 기록이 없었어요');
+};
+const replaceBtn = document.getElementById('replaceBtn');
+let replaceArmed = false;
+function resetReplace(){
+  replaceArmed = false; replaceBtn.classList.remove('armed');
+  document.getElementById('replaceDesc').textContent = '지금 기록을 모두 지우고 백업 내용으로 바꿔요.';
+}
+replaceBtn.onclick = () => {
+  if(!replaceArmed){
+    replaceArmed = true; replaceBtn.classList.add('armed');
+    document.getElementById('replaceDesc').textContent = '정말 바꿀까요? 한 번 더 누르면 지금 기록이 모두 지워져요.';
+    clearTimeout(resetReplace._t); resetReplace._t = setTimeout(resetReplace, 4000);
+    return;
+  }
+  records = { ...pending };
+  saveAll(records); render(); closeSheet();
+  toast(`백업으로 바꿨어요 (${Object.keys(records).length}일)`);
+};
+document.getElementById('importClose').onclick = closeSheet;
+
+/* ---------- 홈 화면에 추가 ---------- */
+const installBtn = document.getElementById('installBtn'), howto = document.getElementById('howto');
+let installEvent = null;
+const ua = navigator.userAgent;
+const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isAndroid = /Android/.test(ua);
+const isInApp = /KAKAOTALK|Instagram|FBAN|FBAV|Line\/|NAVER\(inapp|DaumApps|everytimeApp/i.test(ua);
+const isSamsung = /SamsungBrowser/.test(ua);
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+function updateInstall(){
+  if(isStandalone()){
+    document.getElementById('installDesc').textContent = '지금 홈 화면 앱으로 열려 있어요. 이미 추가가 끝났어요 ✅';
+    installBtn.textContent = '추가 완료'; installBtn.disabled = true; howto.hidden = true;
+  }
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; });
+window.addEventListener('appinstalled', () => { installEvent = null; toast('홈 화면에 추가했어요'); updateInstall(); });
+
+installBtn.onclick = async () => {
+  if(installEvent){                       // 안드로이드 크롬·삼성 인터넷: 바로 설치 창
+    installEvent.prompt();
+    const r = await installEvent.userChoice.catch(() => null);
+    if(r && r.outcome === 'accepted') toast('홈 화면에 추가하는 중이에요');
+    installEvent = null;
+    return;
+  }
+  let html;
+  if(isInApp){
+    html = `<b>지금은 앱 안의 브라우저(카카오톡 등)로 열려 있어요.</b>
+      <ol><li>화면의 <b>⋮</b> 또는 <b>공유</b> 버튼을 누르고</li>
+      <li><b>${isIOS ? 'Safari' : '다른 브라우저'}로 열기</b>를 고른 뒤</li>
+      <li>열린 화면에서 이 버튼을 다시 눌러주세요.</li></ol>`;
+  }else if(isIOS){
+    html = `<b>아이폰은 Safari에서 이렇게 추가해요</b>
+      <ol><li>화면 아래(또는 위)의 <b>공유 버튼 (□↑)</b>을 누르고</li>
+      <li>목록을 내려 <b>홈 화면에 추가</b>를 누른 뒤</li>
+      <li>오른쪽 위 <b>추가</b>를 누르면 끝!</li></ol>`;
+  }else if(isAndroid && isSamsung){
+    html = `<b>삼성 인터넷에서는 이렇게 추가해요</b>
+      <ol><li>아래쪽 <b>≡ 메뉴</b>를 누르고</li>
+      <li><b>현재 페이지 추가 → 홈 화면</b>을 누르면 끝!</li></ol>`;
+  }else if(isAndroid){
+    html = `<b>크롬에서는 이렇게 추가해요</b>
+      <ol><li>오른쪽 위 <b>⋮ 메뉴</b>를 누르고</li>
+      <li><b>홈 화면에 추가</b> (또는 <b>앱 설치</b>)를 누르면 끝!</li></ol>`;
+  }else{
+    html = `<b>컴퓨터에서는</b> 주소창 오른쪽의 <b>설치 아이콘</b>을 누르면 앱처럼 쓸 수 있어요.<br>
+      휴대폰에서 이 주소를 열면 홈 화면에 추가할 수 있어요.`;
+  }
+  howto.innerHTML = html; howto.hidden = false;
+};
+updateInstall();
+
+// 오프라인 도우미 등록 (실제 사이트에서만 동작)
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
+render();
+try{ showTab(localStorage.getItem(TAB_KEY) || 'cal'); }catch(e){}
+</script>
+</body>
+</html>
